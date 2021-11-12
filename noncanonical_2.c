@@ -17,6 +17,12 @@
 #define A 0x01
 #define C 0x03
 #define BCC1 A ^ C
+#define OTHER_RCV 0
+#define FLAG_RCV 1
+#define A_RCV 2
+#define C_RCV 3
+#define BCC_RCV 4
+
 
 volatile int STOP=FALSE;
 
@@ -24,7 +30,7 @@ int main(int argc, char** argv)
 {
     int fd,c, res;
     struct termios oldtio,newtio;
-    char buf[255];
+    unsigned char buf[255];
 
     if ( (argc < 2) || 
   	     ((strcmp("/dev/ttyS0", argv[1])!=0) && 
@@ -76,15 +82,46 @@ int main(int argc, char** argv)
     }
 
     printf("New termios structure set\n");
+    
+    int i = 0;
+    int state = OTHER_RCV;
 
-
-    while (STOP==FALSE) {       /* loop for input */
-      res = read(fd,buf,255);   /* returns after 5 chars have been input */
-      buf[res]=0;               /* so we can printf... */
-      printf(":%s:%d\n", buf, res);        
-
-      if (buf[0]=='z') STOP=TRUE;
+    while (STOP==FALSE) {       
+      res = read(fd,&buf[i],1);   
+                   
+      switch(state){
+        case OTHER_RCV:
+            if(buf[i] == F) { state = FLAG_RCV; }
+            break;
+        
+        case FLAG_RCV:
+            if(buf[i] == F) { state = FLAG_RCV; }
+            else if(buf[i] == A) { state = A_RCV; }
+            else { state = OTHER_RCV; }
+            break;
+        
+        case A_RCV:
+            if(buf[i] == F) { state = FLAG_RCV; }
+            else if(buf[i] == C) { state = C_RCV; }
+            else { state = OTHER_RCV; }
+            break;
+        
+        case C_RCV:
+            if(buf[i] == F) { state = FLAG_RCV; }
+            else if(buf[i] == BCC1) { state = BCC_RCV; }
+            else { state = OTHER_RCV; }
+            break;
+        
+        case BCC_RCV:
+            if(buf[i] == F) { STOP=TRUE; }
+            else { state = OTHER_RCV; }
+            break;
+      }
+      
+      i++;    
     }
+    
+    printf("Message received\n");
 
 
     char ua[5] = {F,A,C,BCC1,F};
