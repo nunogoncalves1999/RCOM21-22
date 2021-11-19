@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <signal.h>
 #include <unistd.h>
 
 #define BAUDRATE B38400
@@ -25,6 +26,8 @@
 
 
 volatile int STOP=FALSE;
+
+int max_timeouts = 5;
 
 int main(int argc, char** argv)
 {
@@ -127,6 +130,18 @@ int main(int argc, char** argv)
 
 
     char ua[5] = {F,A,C,BCC1,F};
+
+    int timeout_count = 0;
+    int flag = 1;
+
+    (void) signal(SIGALRM, atende);
+
+    while(timeout_count < max_timeouts){
+      if(flag == 1){
+        alarm(3);
+        flag = 0;
+      }
+    }
 
     write(fd,ua,5); 
 
