@@ -24,7 +24,7 @@
 #define A_RCV 2
 #define C_RCV 3
 #define BCC_RCV 4
-#define MAX_TIMEOUTS 5
+#define MAX_TIMEOUTS 3
 
 int timeout_count = 0;
 
@@ -35,7 +35,7 @@ void atende()
 {
 	printf("alarme # %d\n", timeout_count);
 	flag = 1;
-	conta++;
+	timeout_count++;
 }
 
 int main(int argc, char** argv)
@@ -77,8 +77,8 @@ int main(int argc, char** argv)
     /* set input mode (non-canonical, no echo,...) */
     newtio.c_lflag = 0;
 
-    newtio.c_cc[VTIME]    = 0;   /* inter-character timer unused */
-    newtio.c_cc[VMIN]     = 5;   /* blocking read until 5 chars received */
+    newtio.c_cc[VTIME]    = 0.1;   /* inter-character timer unused */
+    newtio.c_cc[VMIN]     = 0;   /* blocking read until 5 chars received */
 
 
   /* 
@@ -98,56 +98,54 @@ int main(int argc, char** argv)
 
     unsigned char set[5] = {F,A,C,BCC1,F};
     
-    int i = 0;
     int state;
 
     (void) signal(SIGALRM, atende);
     
     while(timeout_count < MAX_TIMEOUTS && flag < 2){
-        res = write(fd,set,5);   
-        printf("%d bytes written\n", res);
-
-        state = OTHER_RCV;
         flag = 0;
         alarm(3);
+
+        res = write(fd,set,5);   
         
-        while (flag == 0) {    
+        state = OTHER_RCV;
+
+        while (flag == 0) {   
              
-          res = read(fd,&buf[i],1);   
+          res = read(fd,buf,1);   
                        
           switch(state){
             case OTHER_RCV:
-                if(buf[i] == F) { state = FLAG_RCV; }
+                if(buf[0] == F) { state = FLAG_RCV; }
                 break;
             
             case FLAG_RCV:
-                if(buf[i] == F) { state = FLAG_RCV; }
-                else if(buf[i] == A) { state = A_RCV; }
+                if(buf[0] == F) { state = FLAG_RCV; }
+                else if(buf[0] == A) { state = A_RCV; }
                 else { state = OTHER_RCV; }
                 break;
             
             case A_RCV:
-                if(buf[i] == F) { state = FLAG_RCV; }
-                else if(buf[i] == C) { state = C_RCV; }
+                if(buf[0] == F) { state = FLAG_RCV; }
+                else if(buf[0] == C) { state = C_RCV; }
                 else { state = OTHER_RCV; }
                 break;
             
             case C_RCV:
-                if(buf[i] == F) { state = FLAG_RCV; }
-                else if(buf[i] == BCC1) { state = BCC_RCV; }
+                if(buf[0] == F) { state = FLAG_RCV; }
+                else if(buf[0] == BCC1) { state = BCC_RCV; }
                 else { state = OTHER_RCV; }
                 break;
             
             case BCC_RCV:
-                if(buf[i] == F) {  
+                if(buf[0] == F) {  
                     alarm(0);
                     flag = 2;
                 }
                 else { state = OTHER_RCV; }
                 break;
           }
-          
-          i++;    
+            
         }
     }
 
