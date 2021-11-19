@@ -10,7 +10,7 @@
 #include <signal.h>
 #include <unistd.h>
 
-#define BAUDRATE B38400
+#define BAUDRATE B9600
 #define MODEMDEVICE "/dev/ttyS1"
 #define _POSIX_SOURCE 1 /* POSIX compliant source */
 #define FALSE 0
@@ -24,8 +24,19 @@
 #define A_RCV 2
 #define C_RCV 3
 #define BCC_RCV 4
+#define MAX_TIMEOUTS 5
 
-volatile int STOP=FALSE;
+int timeout_count = 0;
+
+//flag controls the timeout mechanism; 0 if waiting, 1 if timeout and 2 if received
+volatile int flag = 0;
+
+void atende()                   
+{
+	printf("alarme # %d\n", timeout_count);
+	flag = 1;
+	conta++;
+}
 
 int main(int argc, char** argv)
 {
@@ -37,8 +48,8 @@ int main(int argc, char** argv)
     if ( (argc < 2) || 
   	     ((strcmp("/dev/ttyS0", argv[1])!=0) && 
   	      (strcmp("/dev/ttyS1", argv[1])!=0) &&
-          (strcmp("/dev/ttyS10", argv[1])!=0) && )
-          (strcmp("/dev/ttyS11", argv[1])!=0)) {
+          (strcmp("/dev/ttyS10", argv[1])!=0) && 
+          (strcmp("/dev/ttyS11", argv[1])!=0))) {
       printf("Usage:\tnserial SerialPort\n\tex: nserial /dev/ttyS1\n");
       exit(1);
     }
@@ -70,12 +81,10 @@ int main(int argc, char** argv)
     newtio.c_cc[VMIN]     = 5;   /* blocking read until 5 chars received */
 
 
-
   /* 
     VTIME e VMIN devem ser alterados de forma a proteger com um temporizador a 
     leitura do(s) pr�ximo(s) caracter(es)
   */
-
 
 
     tcflush(fd, TCIOFLUSH);
@@ -88,72 +97,73 @@ int main(int argc, char** argv)
     printf("New termios structure set\n");
 
     unsigned char set[5] = {F,A,C,BCC1,F};
-
-    /*for (i = 0; i < 255; i++) {
-      buf[i] = 'a';
-    }*/
     
-    /*testing*/
-    //buf[1] = '\n';
-    
-    res = write(fd,set,5);   
-    printf("%d bytes written\n", res);
-
     int i = 0;
-    int state = OTHER_RCV;
+    int state;
 
-    while (STOP==FALSE) {       
-      res = read(fd,&buf[i],1);   
-                   
-      switch(state){
-        case OTHER_RCV:
-            if(buf[i] == F) { state = FLAG_RCV; }
-            break;
+    (void) signal(SIGALRM, atende);
+    
+    while(timeout_count < MAX_TIMEOUTS && flag < 2){
+        res = write(fd,set,5);   
+        printf("%d bytes written\n", res);
+
+        state = OTHER_RCV;
+        flag = 0;
+        alarm(3);
         
-        case FLAG_RCV:
-            if(buf[i] == F) { state = FLAG_RCV; }
-            else if(buf[i] == A) { state = A_RCV; }
-            else { state = OTHER_RCV; }
-            break;
-        
-        case A_RCV:
-            if(buf[i] == F) { state = FLAG_RCV; }
-            else if(buf[i] == C) { state = C_RCV; }
-            else { state = OTHER_RCV; }
-            break;
-        
-        case C_RCV:
-            if(buf[i] == F) { state = FLAG_RCV; }
-            else if(buf[i] == BCC1) { state = BCC_RCV; }
-            else { state = OTHER_RCV; }
-            break;
-        
-        case BCC_RCV:
-            if(buf[i] == F) { STOP=TRUE; }
-            else { state = OTHER_RCV; }
-            break;
-      }
-      
-      i++;    
+        while (flag == 0) {    
+             
+          res = read(fd,&buf[i],1);   
+                       
+          switch(state){
+            case OTHER_RCV:
+                if(buf[i] == F) { state = FLAG_RCV; }
+                break;
+            
+            case FLAG_RCV:
+                if(buf[i] == F) { state = FLAG_RCV; }
+                else if(buf[i] == A) { state = A_RCV; }
+                else { state = OTHER_RCV; }
+                break;
+            
+            case A_RCV:
+                if(buf[i] == F) { state = FLAG_RCV; }
+                else if(buf[i] == C) { state = C_RCV; }
+                else { state = OTHER_RCV; }
+                break;
+            
+            case C_RCV:
+                if(buf[i] == F) { state = FLAG_RCV; }
+                else if(buf[i] == BCC1) { state = BCC_RCV; }
+                else { state = OTHER_RCV; }
+                break;
+            
+            case BCC_RCV:
+                if(buf[i] == F) {  
+                    alarm(0);
+                    flag = 2;
+                }
+                else { state = OTHER_RCV; }
+                break;
+          }
+          
+          i++;    
+        }
+    }
+
+    if(timeout_count >= MAX_TIMEOUTS){
+        printf("Max number of timeouts reached\n");
     }
     
-    printf("Message received back\n");
- 
-
-  /* 
-    O ciclo FOR e as instru��es seguintes devem ser alterados de modo a respeitar 
-    o indicado no gui�o 
-  */
-
-
+    else{
+        printf("Message received back\n");
+    }
 
    
     if ( tcsetattr(fd,TCSANOW,&oldtio) == -1) {
       perror("tcsetattr");
       exit(-1);
     }
-
-
 
 
     close(fd);

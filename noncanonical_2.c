@@ -10,7 +10,7 @@
 #include <signal.h>
 #include <unistd.h>
 
-#define BAUDRATE B38400
+#define BAUDRATE B9600
 #define _POSIX_SOURCE 1 /* POSIX compliant source */
 #define FALSE 0
 #define TRUE 1
@@ -27,8 +27,6 @@
 
 volatile int STOP=FALSE;
 
-int max_timeouts = 5;
-
 int main(int argc, char** argv)
 {
     int fd,c, res;
@@ -38,8 +36,8 @@ int main(int argc, char** argv)
     if ( (argc < 2) || 
   	     ((strcmp("/dev/ttyS0", argv[1])!=0) && 
   	      (strcmp("/dev/ttyS1", argv[1])!=0) &&
-          (strcmp("/dev/ttyS10", argv[1])!=0) && )
-          (strcmp("/dev/ttyS11", argv[1])!=0)) {
+          (strcmp("/dev/ttyS10", argv[1])!=0) && 
+          (strcmp("/dev/ttyS11", argv[1])!=0))) {
       printf("Usage:\tnserial SerialPort\n\tex: nserial /dev/ttyS1\n");
       exit(1);
     }
@@ -130,18 +128,6 @@ int main(int argc, char** argv)
 
 
     char ua[5] = {F,A,C,BCC1,F};
-
-    int timeout_count = 0;
-    int flag = 1;
-
-    (void) signal(SIGALRM, atende);
-
-    while(timeout_count < max_timeouts){
-      if(flag == 1){
-        alarm(3);
-        flag = 0;
-      }
-    }
 
     write(fd,ua,5); 
 
