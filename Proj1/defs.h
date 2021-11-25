@@ -19,6 +19,12 @@
 #define C_RE 0x03
 #define BCC1_RE A_RE ^ C_RE
 
+#define OTHER_RCV 0
+#define FLAG_RCV 1
+#define A_RCV 2
+#define C_RCV 3
+#define BCC_RCV 4
+
 #define ESCAPE 0x7D
 #define XOR_BYTE 0x20
 
