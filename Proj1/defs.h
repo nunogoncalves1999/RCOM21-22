@@ -12,10 +12,19 @@
 #define REJ 0x81 | 0x01
 
 #define FLAG 0x7E
-#define A_ER_COM 0x03
-#define A_RE_COM 0x01
+#define A_TR 0x03
+#define C_TR 0x07
+#define BCC1_TR A_TR ^ C_TR
+#define A_RE 0x01
+#define C_RE 0x03
+#define BCC1_RE A_RE ^ C_RE
 
 #define ESCAPE 0x7D
 #define XOR_BYTE 0x20
 
 #define MAX_SIZE 255
+
+#define TRANSMITER 0
+#define RECEIVER 1
+
+#define DEFAULT_BAUD B9600
