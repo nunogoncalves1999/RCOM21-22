@@ -100,11 +100,12 @@ int setup_port(int port){
 }
 
 int setup_transmitter(int fd){
-    char set[5] = {FLAG, A_TR, C_TR, BCC1_TR, FLAG};
+    char set[5] = {FLAG, A_TR, SET, A_TR ^ SET, FLAG};
 
     int state;
     timeoutCount = 0;
     sequenceNumber = 0;
+    flag = 0;
 
     (void) signal(SIGALRM, timeout_handler);
 
@@ -133,13 +134,13 @@ int setup_transmitter(int fd){
                     
                 case A_RCV:
                     if(buffer[0] == FLAG) { state = FLAG_RCV; }
-                    else if(buf[0] == C_RE) { state = C_RCV; }
+                    else if(buf[0] == UA) { state = C_RCV; }
                     else { state = OTHER_RCV; }
                     break;
                     
                 case C_RCV:
                     if(buffer[0] == FLAG) { state = FLAG_RCV; }
-                    else if(buf[0] == BCC1_RE) { state = BCC_RCV; }
+                    else if(buf[0] == A_RE ^ UA) { state = BCC_RCV; }
                     else { state = OTHER_RCV; }
                     break;
                     
@@ -203,6 +204,34 @@ int llread(int fd, char* buffer){
 }
 
 int llclose(int fd){
-    printf("Not implemented yet\n");
-    return -1;
+    
+    if(sequenceNumber == 0){
+        char disc[5] = {FLAG, A_TR, DISC, A_TR ^ DISC, FLAG};
+
+        if(fcntl(fd, GETFD) < 0){
+            perror("Invalid fd\n");
+            return -1;
+        }
+
+        int state;
+        timeoutCount = 0;
+        flag = 0;
+        
+        (void) signal(SIGALRM, timeout_handler);
+
+        while(timeoutCount < maxTimeouts && flag < 2){
+
+        }
+    }
+
+    else if(sequenceNumber == 1){
+
+    }
+
+    else{
+        printf("Invalid sequence number!");
+        return -1;
+    }
+
+    return 1;
 }

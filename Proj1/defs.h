@@ -13,11 +13,7 @@
 
 #define FLAG 0x7E
 #define A_TR 0x03
-#define C_TR 0x07
-#define BCC1_TR A_TR ^ C_TR
 #define A_RE 0x01
-#define C_RE 0x03
-#define BCC1_RE A_RE ^ C_RE
 
 #define OTHER_RCV 0
 #define FLAG_RCV 1
