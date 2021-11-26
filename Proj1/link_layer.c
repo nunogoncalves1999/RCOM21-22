@@ -61,7 +61,7 @@ int setup_port(int port){
         break;
     
     default:
-        perror("Invalid port number\n");
+        perror("Invalid port number");
         return -1;
     }
 
@@ -113,7 +113,7 @@ int setup_transmitter(int fd){
         flag = 0;
         alarm(timeout);
 
-        write(fd,set,5);   
+        write(fd, set, 5);   
             
         state = OTHER_RCV;
 
@@ -128,19 +128,19 @@ int setup_transmitter(int fd){
                     
                 case FLAG_RCV:
                     if(buffer[0] == FLAG) { state = FLAG_RCV; }
-                    else if(buf[0] == A_RE) { state = A_RCV; }
+                    else if(buffer[0] == A_RE) { state = A_RCV; }
                     else { state = OTHER_RCV; }
                     break;
                     
                 case A_RCV:
                     if(buffer[0] == FLAG) { state = FLAG_RCV; }
-                    else if(buf[0] == UA) { state = C_RCV; }
+                    else if(buffer[0] == UA) { state = C_RCV; }
                     else { state = OTHER_RCV; }
                     break;
                     
                 case C_RCV:
                     if(buffer[0] == FLAG) { state = FLAG_RCV; }
-                    else if(buf[0] == A_RE ^ UA) { state = BCC_RCV; }
+                    else if(buffer[0] == A_RE ^ UA) { state = BCC_RCV; }
                     else { state = OTHER_RCV; }
                     break;
                     
@@ -157,7 +157,75 @@ int setup_transmitter(int fd){
     }
 
     if(timeoutCount >= maxTimeouts){
-        perror("Too many timeouts ocurred, couldn't acnowledge port\n");
+        perror("Too many timeouts ocurred, couldn't acnowledge port");
+        return -1;
+    }
+
+    return 0;
+}
+
+int send_disconect_message(int fd){
+    char disc[5] = {FLAG, A_TR, DISC, A_TR ^ DISC, FLAG};
+    char ua[5] = {FLAG, A_TR, UA, A_TR ^ UA, FLAG};
+
+    int state;
+    timeoutCount = 0;
+    flag = 0;
+        
+    (void) signal(SIGALRM, timeout_handler);
+
+    while(timeoutCount < maxTimeouts && flag < 2){
+        flag = 0;
+        alarm(timeout);
+
+        write(fd, disc, 5);   
+                
+        state = OTHER_RCV;
+
+        while (flag == 0) {   
+                
+            read(fd, buffer, 1);   
+                                
+            switch(state){
+                case OTHER_RCV:
+                    if(buffer[0] == FLAG) { state = FLAG_RCV; }
+                    break;
+                        
+                case FLAG_RCV:
+                    if(buffer[0] == FLAG) { state = FLAG_RCV; }
+                    else if(buffer[0] == A_RE) { state = A_RCV; }
+                    else { state = OTHER_RCV; }
+                    break;
+                        
+                case A_RCV:
+                    if(buffer[0] == FLAG) { state = FLAG_RCV; }
+                    else if(buffer[0] == DISC) { state = C_RCV; }
+                    else { state = OTHER_RCV; }
+                    break;
+                        
+                case C_RCV:
+                    if(buffer[0] == FLAG) { state = FLAG_RCV; }
+                    else if(buffer[0] == A_RE ^ DISC) { state = BCC_RCV; }
+                    else { state = OTHER_RCV; }
+                    break;
+                        
+                case BCC_RCV:
+                    if(buffer[0] == FLAG) {  
+                        alarm(0);
+                        flag = 2;
+                    }
+                    else { state = OTHER_RCV; }
+                    break;
+            }
+        }
+    }
+
+    if(flag == 2){
+        write(fd, ua, 5);
+    }
+
+    else{
+        perror("Too many timeouts ocurred, couldn't send acnowledgement message on close");
         return -1;
     }
 
@@ -184,7 +252,7 @@ int llopen(int port, int mode){
     }
 
     else{
-        printf("Error! Invalid mode\n");
+        perror("Invalid mode");
         return -1;
     }
 
@@ -204,32 +272,30 @@ int llread(int fd, char* buffer){
 }
 
 int llclose(int fd){
+
+    if(fcntl(fd, GETFD) < 0){
+        perror("Invalid fd");
+        return -1;
+    }
     
     if(sequenceNumber == 0){
-        char disc[5] = {FLAG, A_TR, DISC, A_TR ^ DISC, FLAG};
-
-        if(fcntl(fd, GETFD) < 0){
-            perror("Invalid fd\n");
+        if(send_disconect_message(int fd) < 0){
             return -1;
         }
-
-        int state;
-        timeoutCount = 0;
-        flag = 0;
-        
-        (void) signal(SIGALRM, timeout_handler);
-
-        while(timeoutCount < maxTimeouts && flag < 2){
-
-        }
     }
 
-    else if(sequenceNumber == 1){
-
+    else if(sequenceNumber != 1){
+        perror("Invalid sequence number!");
+        return -1;
     }
 
-    else{
-        printf("Invalid sequence number!");
+    if(tcsetattr(fd, TCSANOW, &oldtio) == -1) {
+        perror("Error while restoring port settings");
+        return -1;
+    }
+
+    if(close(fd) != 0){
+        perror("Error while closing port");
         return -1;
     }
 
