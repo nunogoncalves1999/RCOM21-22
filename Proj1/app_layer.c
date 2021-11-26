@@ -61,13 +61,25 @@ int main(int argc, char *argv[])
     fd = llopen(argv[1], mode);
 
     if(fd < 0){
-        printf("Error while opening port\n");
         return -1;
     }
 
     //Read loop if receiver
+    if(mode == 1){
+
+    }
 
     //Write loop if transmitter
+    if(mode == 0){
+
+    }
 
     //Closing file, cleaning up used space and printing debugs to check errors
+    fclose(file);
+
+    if(llclose(fd) != 1){
+        return -1;
+    }
+
+    return 0;
 }
