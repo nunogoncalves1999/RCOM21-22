@@ -15,7 +15,7 @@
 int fd;
 int mode;
 
-char* path;
+char* path; 
 size_t packet_size;
 FILE* file;
 
@@ -41,14 +41,14 @@ int main(int argc, char *argv[])
     if(mode == 0){
         if(argc < 5){
             printf("Usage: file_transfer <port 0|1|2|11|12> <mode 0|1> <file path> <packet size>\n
-                port: /dev/ttySn, where n is the number entered\n
-                mode: 0 for transmiter and 1 for receiver\n
-                file path and packet size should only be entered if mode is 0 (transmiter)\n");
-                return -1;
+                    port: /dev/ttySn, where n is the number entered\n
+                    mode: 0 for transmiter and 1 for receiver\n
+                    file path and packet size should only be entered if mode is 0 (transmiter)\n");
+            return -1;
         }
 
         path = argv[3];
-        file = fopen(path, "r");
+        file = fopen(path, "rb");
         
         if(file == NULL){
             perror("Couldn't open the file indicated in <file path>");
@@ -56,6 +56,11 @@ int main(int argc, char *argv[])
         }
 
         packet_size = argv[4];
+
+        if(packet_size > MAX_PACKET_SIZE){
+            perror("Packet size too big");
+            return -1;
+        }
     }
 
     fd = llopen(argv[1], mode);
@@ -66,7 +71,7 @@ int main(int argc, char *argv[])
 
     //Read loop if receiver
     if(mode == 1){
-
+        
     }
 
     //Write loop if transmitter

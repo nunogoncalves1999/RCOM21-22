@@ -41,23 +41,23 @@ int setup_port(int port){
     switch (port)
     {
     case 0:
-        portName = "/dev/ttyS0"
+        *portName = "/dev/ttyS0";
         break;
     
     case 1:
-        portName = "/dev/ttyS1"
+        *portName = "/dev/ttyS1";
         break;
 
     case 2:
-        portName = "/dev/ttyS2"
+        *portName = "/dev/ttyS2";
         break;
 
     case 10:
-        portName = "/dev/ttyS10"
+        *portName = "/dev/ttyS10";
         break;
 
     case 11:
-        portName = "/dev/ttyS11"
+        *portName = "/dev/ttyS11";
         break;
     
     default:
@@ -102,6 +102,7 @@ int setup_port(int port){
 int setup_transmitter(int fd){
     char set[5] = {FLAG, A_TR, SET, A_TR ^ SET, FLAG};
 
+    char* buffer[255];
     int state;
     timeoutCount = 0;
     sequenceNumber = 0;
@@ -164,10 +165,57 @@ int setup_transmitter(int fd){
     return 0;
 }
 
+int setup_receiver(int fd){
+    char ua[5] = {FLAG, A_RE, UA, A_RE ^ UA, FLAG};
+
+    char* buffer[255];
+    int state;
+    int stop = FALSE;
+
+    while (stop == FALSE) {       
+      read(fd, &buffer[0], 1);   
+                   
+      switch(state){
+        case OTHER_RCV:
+            if(buffer[0] == FLAG) { state = FLAG_RCV; }
+            break;
+        
+        case FLAG_RCV:
+            if(buffer[0] == FLAG) { state = FLAG_RCV; }
+            else if(buffer[0] == A_TR) { state = A_RCV; }
+            else { state = OTHER_RCV; }
+            break;
+        
+        case A_RCV:
+            if(buffer[0] == F) { state = FLAG_RCV; }
+            else if(buffer[0] == SET) { state = C_RCV; }
+            else { state = OTHER_RCV; }
+            break;
+        
+        case C_RCV:
+            if(buffer[0] == F) { state = FLAG_RCV; }
+            else if(buffer[0] == A_TR ^ SET) { state = BCC_RCV; }
+            else { state = OTHER_RCV; }
+            break;
+        
+        case BCC_RCV:
+            if(buffer[0] == FLAG) { stop = TRUE; }
+            else { state = OTHER_RCV; }
+            break;
+      }
+        
+    }
+
+    write(fd, ua, 5); 
+
+    return 0;
+}
+
 int send_disconect_message(int fd){
     char disc[5] = {FLAG, A_TR, DISC, A_TR ^ DISC, FLAG};
     char ua[5] = {FLAG, A_TR, UA, A_TR ^ UA, FLAG};
 
+    char* buffer[255];
     int state;
     timeoutCount = 0;
     flag = 0;
@@ -232,10 +280,100 @@ int send_disconect_message(int fd){
     return 0;
 }
 
+int send_disconect_answer(int fd){
+    char disc[5] = {FLAG, A_RE, DISC, A_RE ^ DISC, FLAG};
+
+    char* buffer[255];
+    int state;
+    timeoutCount = 0;
+    stop = FALSE;
+
+    while(stop == FALSE){
+        read(fd, &buffer[0], 1);   
+                   
+        switch(state){
+            case OTHER_RCV:
+                if(buffer[0] == FLAG) { state = FLAG_RCV; }
+                break;
+            
+            case FLAG_RCV:
+                if(buffer[0] == FLAG) { state = FLAG_RCV; }
+                else if(buffer[0] == A_TR) { state = A_RCV; }
+                else { state = OTHER_RCV; }
+                break;
+            
+            case A_RCV:
+                if(buffer[0] == F) { state = FLAG_RCV; }
+                else if(buffer[0] == DISC) { state = C_RCV; }
+                else { state = OTHER_RCV; }
+                break;
+            
+            case C_RCV:
+                if(buffer[0] == F) { state = FLAG_RCV; }
+                else if(buffer[0] == A_TR ^ DISC) { state = BCC_RCV; }
+                else { state = OTHER_RCV; }
+                break;
+            
+            case BCC_RCV:
+                if(buffer[0] == FLAG) { stop = TRUE; }
+                else { state = OTHER_RCV; }
+                break;
+        }
+    }
+
+    write(fd, disc, 5);
+    flag = 0;
+
+    (void) signal(SIGALRM, timeout_handler);
+    alarm(timeout);
+
+    while(flag == 0){
+        read(fd, &buffer[0], 1);   
+                   
+        switch(state){
+            case OTHER_RCV:
+                if(buffer[0] == FLAG) { state = FLAG_RCV; }
+                break;
+            
+            case FLAG_RCV:
+                if(buffer[0] == FLAG) { state = FLAG_RCV; }
+                else if(buffer[0] == A_TR) { state = A_RCV; }
+                else { state = OTHER_RCV; }
+                break;
+            
+            case A_RCV:
+                if(buffer[0] == F) { state = FLAG_RCV; }
+                else if(buffer[0] == UA) { state = C_RCV; }
+                else { state = OTHER_RCV; }
+                break;
+            
+            case C_RCV:
+                if(buffer[0] == F) { state = FLAG_RCV; }
+                else if(buffer[0] == A_TR ^ UA) { state = BCC_RCV; }
+                else { state = OTHER_RCV; }
+                break;
+            
+            case BCC_RCV:
+                if(buffer[0] == FLAG) { 
+                    alarm(0);
+                    flag = 2;  
+                }
+                else { state = OTHER_RCV; }
+                break;
+        }
+    }
+
+    if(flag == 1){
+        perror("UA acnowledgement not received");
+        return -1;
+    }
+
+    return 0;
+}
+
 int llopen(int port, int mode){
     int fd;
     int errorValue;
-    char* buffer[255];
 
     fd = setup_port(port);
 
@@ -248,7 +386,7 @@ int llopen(int port, int mode){
     }
 
     else if(mode == RECEIVER){
-        sequenceNumber = 1;
+        if(setup_receiver(fd) < 0) { return -1; }
     }
 
     else{
@@ -279,12 +417,18 @@ int llclose(int fd){
     }
     
     if(sequenceNumber == 0){
-        if(send_disconect_message(int fd) < 0){
+        if(send_disconect_message(fd) < 0){
             return -1;
         }
     }
 
-    else if(sequenceNumber != 1){
+    else if(sequenceNumber == 1){
+        if(send_disconect_answer(fd) < 0){
+            return -1;
+        }
+    }
+
+    else{
         perror("Invalid sequence number!");
         return -1;
     }

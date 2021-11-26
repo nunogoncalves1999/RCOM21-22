@@ -4,12 +4,15 @@
 #define FALSE 0
 #define TRUE 1
 
-#define CTR_I_FRAME 0x40 | 0x00
+#define CTR_I_FRAME0 0x00
+#define CTR_I_FRAME1 0x40
 #define SET 0x03
 #define DISC 0x0B
 #define UA 0x07
-#define RR 0x85 | 0x05
-#define REJ 0x81 | 0x01
+#define RR0 0x05
+#define RR1 0x85
+#define REJ0 0x01
+#define REJ1 0x81
 
 #define FLAG 0x7E
 #define A_TR 0x03
@@ -25,6 +28,7 @@
 #define XOR_BYTE 0x20
 
 #define MAX_SIZE 255
+#define MAX_PACKET_SIZE 64000
 
 #define TRANSMITER 0
 #define RECEIVER 1
