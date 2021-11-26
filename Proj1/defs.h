@@ -4,6 +4,10 @@
 #define FALSE 0
 #define TRUE 1
 
+#define DATA_PACKET 1
+#define START_PACKET 2
+#define END_PACKET 3
+
 #define CTR_I_FRAME0 0x00
 #define CTR_I_FRAME1 0x40
 #define SET 0x03

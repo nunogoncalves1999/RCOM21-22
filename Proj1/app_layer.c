@@ -71,7 +71,7 @@ int main(int argc, char *argv[])
 
     //Read loop if receiver
     if(mode == 1){
-        
+
     }
 
     //Write loop if transmitter
