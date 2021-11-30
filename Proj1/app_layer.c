@@ -14,6 +14,7 @@
 
 int fd;
 int mode;
+int portNr;
 
 char* path; 
 size_t packet_size;
@@ -24,15 +25,17 @@ int main(int argc, char *argv[])
 
     //Process args for transmitter and receiver modes
     if(argc < 3){
-        printf("Usage: file_transfer <port 0|1|2|11|12> <mode 0|1> <file path> <packet size>\n
-                port: /dev/ttySn, where n is the number entered\n
-                mode: 0 for transmiter and 1 for receiver\n
-                file path and packet size should only be entered if mode is 0 (transmiter)\n");
+        printf("Usage: file_transfer <port 0|1|2|11|12> <mode 0|1> <file path> <packet size>\n");
+        printf("port: /dev/ttySn, where n is the number entered\n");
+        printf("mode: 0 for transmiter and 1 for receiver\n");
+        printf("file path and packet size should only be entered if mode is 0 (transmiter)\n");
         
         return -1;
     }
 
-    mode = argv[2];
+    portNr = strtol(argv[1], NULL, 10);
+    mode = strtol(argv[2], NULL, 10);
+
     if(mode != 0 && mode != 1){
         printf("Invalid mode; mode can only be 0 (transmiter) or 1 (receiver)\n");
         return -1;
@@ -40,10 +43,10 @@ int main(int argc, char *argv[])
 
     if(mode == 0){
         if(argc < 5){
-            printf("Usage: file_transfer <port 0|1|2|11|12> <mode 0|1> <file path> <packet size>\n
-                    port: /dev/ttySn, where n is the number entered\n
-                    mode: 0 for transmiter and 1 for receiver\n
-                    file path and packet size should only be entered if mode is 0 (transmiter)\n");
+            printf("Usage: file_transfer <port 0|1|2|11|12> <mode 0|1> <file path> <packet size>\n");
+            printf("port: /dev/ttySn, where n is the number entered\n");
+            printf("mode: 0 for transmiter and 1 for receiver\n");
+            printf("file path and packet size should only be entered if mode is 0 (transmiter)\n");
             return -1;
         }
 
@@ -55,7 +58,7 @@ int main(int argc, char *argv[])
             return -1;
         }
 
-        packet_size = argv[4];
+        packet_size = strtol(argv[4], NULL, 10);
 
         if(packet_size > MAX_PACKET_SIZE){
             perror("Packet size too big");
@@ -63,7 +66,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    fd = llopen(argv[1], mode);
+    fd = llopen(portNr, mode);
 
     if(fd < 0){
         return -1;

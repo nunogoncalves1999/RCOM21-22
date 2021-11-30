@@ -7,6 +7,8 @@ int setup_port(int port);
 
 int setup_transmiter(int fd);
 
+int setup_receiver(int fd);
+
 int send_disconect_message(int fd);
 
 int send_disconect_answer(int fd);
@@ -18,3 +20,5 @@ int llwrite(int fd, char* buffer, int length);
 int llread(int fd, char* buffer);
 
 int llclose(int fd);
+
+#endif
