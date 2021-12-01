@@ -60,7 +60,7 @@ int main(int argc, char *argv[])
 
         packet_size = strtol(argv[4], NULL, 10);
 
-        if(packet_size > MAX_PACKET_SIZE){
+        if(packet_size > (MAX_PACKET_SIZE - FRAME_INFO_SIZE)){
             perror("Packet size too big");
             return -1;
         }

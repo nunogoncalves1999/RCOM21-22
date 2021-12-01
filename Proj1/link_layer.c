@@ -9,6 +9,7 @@
 #include <unistd.h>
 
 #include "defs.h"
+#include "link_layer.h"
 
 char* portName;
 int baudrate = DEFAULT_BAUD;
@@ -16,7 +17,10 @@ unsigned int sequenceNumber;
 unsigned int timeout = 1;
 unsigned int maxTimeouts = 5;
 
-char frame[MAX_SIZE];
+unsigned int s = 0;
+unsigned int r = 1;
+
+char frame[MAX_PACKET_SIZE];
 
 struct termios oldtio;
 
@@ -371,6 +375,44 @@ int send_disconect_answer(int fd){
     return 0;
 }
 
+byte_stuffing(char *frame, int *length){
+    int extra_length = 0;
+    int prev_length = *length;
+
+    for(int i = 0; i < prev_length - FRAME_INFO_SIZE; i++){
+        if(frame[i + FRAME_INFO_SIZE] == FLAG || frame[i + FRAME_INFO_SIZE] == ESCAPE){
+            extra_length++;
+        }
+    }
+
+    *length += extra_length;
+    char tempFrame[*length];
+    int j = 0;
+    
+    for(int i = 0; i < prev_length - FRAME_INFO_SIZE; i++){
+        if(frame[i + FRAME_INFO_SIZE] == FLAG){
+            tempFrame[j] = ESCAPE;
+            tempFrame[j+1] = FLAG ^ XOR_BYTE;
+            j += 2;
+        }
+        else if(frame[i + FRAME_INFO_SIZE] == ESCAPE){
+            tempFrame[j] = ESCAPE;
+            tempFrame[j+1] = ESCAPE ^ XOR_BYTE;
+            j += 2;
+        }
+        else{
+            tempFrame[j] = frame[i];
+            j++;
+        }   
+    }
+
+    for(int i = 0; i < *length; i++){
+        frame[i + FRAME_INFO_SIZE] = tempFrame[i];
+    }
+
+    frame[*length - 1] = FLAG;
+}
+
 int llopen(int port, int mode){
     int fd;
 
@@ -399,7 +441,43 @@ int llopen(int port, int mode){
 }
 
 int llwrite(int fd, char* buffer, int length){
-    printf("Not implemented yet\n");
+
+    int frame_length = length + FRAME_INFO_SIZE;
+    char bcc2;
+    
+    frame[0] = FLAG;
+    frame[1] = A_TR;
+    
+    if(r == 1){
+        frame[2] = CTR_I_FRAME1;
+        frame[3] = A_TR ^ CTR_I_FRAME1;
+    }
+
+    else if(r == 0){
+        frame[2] = CTR_I_FRAME0;
+        frame[3] = A_TR ^ CTR_I_FRAME0;
+    }
+
+    for (int i = 0; i < length; i++)
+    {
+        frame[i + INITIAL_FRAME_BITS] = buffer[i];
+        if(i == 0){
+            bcc2 = buffer[i];
+        }
+        else{
+            bcc2 ^= buffer[i];
+        }
+    }
+    
+    frame[frame_length - 2] = bcc2;
+    frame[frame_length - 1] = FLAG;
+
+    byte_stuffing(frame, &frame_length);
+
+    else{
+        perror("r has an erroneous value, it should only take values of 1 or 0");
+    }
+
     return -1;
 }
 

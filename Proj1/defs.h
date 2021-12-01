@@ -31,7 +31,8 @@
 #define ESCAPE 0x7D
 #define XOR_BYTE 0x20
 
-#define MAX_SIZE 255
+#define FRAME_INFO_SIZE 6
+#define INITIAL_FRAME_BITS 4
 #define MAX_PACKET_SIZE 64000
 
 #define TRANSMITER 0
