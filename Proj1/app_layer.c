@@ -78,6 +78,30 @@ int buildDataPacket(char** packet, int packet_nr, char* data, int data_size){
     return packet_size;
 }
 
+void unpackControlPacket(char* packet, char** filename){
+    int pointer = 2;
+    int fs_oct = packet[pointer];
+    pointer++;
+
+    file_size = 0;
+    for(int i = 0; i < fs_oct; i++){
+        file_size += (packet[pointer] << 8 *(fs_oct - i - 1));
+        pointer++;
+    }
+
+    pointer++;
+
+    int fn_length = packet[pointer];
+    pointer++;
+    *filename = malloc(fn_length + 1);
+
+    for(int i = 0; i < fn_length; i++){
+        *filename[i] = packet[pointer];
+        pointer++;
+    }
+    *filename[fn_length] = '\0';
+}
+
 int main(int argc, char *argv[])
 {
 
@@ -95,12 +119,12 @@ int main(int argc, char *argv[])
     mode = strtol(argv[2], NULL, 10);
     char* buffer;
 
-    if(mode != 0 && mode != 1){
+    if(mode != TRANSMITER && mode != RECEIVER){
         printf("Invalid mode; mode can only be 0 (transmiter) or 1 (receiver)\n");
         return -1;
     }
 
-    if(mode == 0){
+    if(mode == TRANSMITER){
         if(argc < 5){
             printf("Usage: file_transfer <port 0|1|2|10|11> <mode 0|1> <file path> <packet size>\n");
             printf("port: /dev/ttySn, where n is the number entered\n");
@@ -142,14 +166,43 @@ int main(int argc, char *argv[])
 
     char* control_packet = NULL;
     char* data_packet = NULL;
-    int fread_return;
+    int file_op_return;
 
     //Read loop if receiver
-    if(mode == 1){
+    if(mode == RECEIVER){
         int bytesRead = 0;
+        char* filename;
+        buffer = malloc(256);
 
-        while(bytesRead != 3 && bytesRead != 4 && bytesRead >= 0){
+        while(1){
             bytesRead = llread(fd, buffer);
+
+            if(bytesRead != 3 && bytesRead != 4 && bytesRead >= 0){
+                break;
+            }
+
+            if(buffer[0] == START_PACKET){
+                unpackControlPacket(buffer, &filename);
+
+                if(file_size > 256){
+                    buffer = realloc(buffer, file_size);
+                }
+
+                file = fopen(filename, "w");
+            }
+
+            else if(buffer[0] == DATA_PACKET){
+                file_op_return = fwrite(&buffer[4], bytesRead - 4, 1, file);
+
+                if(file_op_return != 1 || feof(file) > 0){
+                    perror("Error while writing in file");
+                    continue;
+                }
+            }
+
+            else if(buffer[0] == END_PACKET){
+                printf("End packet received\n");
+            }
         }
 
         if(bytesRead < 0){
@@ -158,9 +211,12 @@ int main(int argc, char *argv[])
     }
 
     //Write loop if transmitter
-    if(mode == 0){
+    if(mode == TRANSMITER){
+        printf("Transmiter beggining entered\n");
         int cp_length = buildControlPacket(&control_packet);
+        printf("Control packet built\n");
         int bytes_writen = llwrite(fd, control_packet, cp_length);
+        printf("Control packet sent\n");
 
         if(bytes_writen > 0){
             int data_packets_writen = 0;
@@ -171,8 +227,8 @@ int main(int argc, char *argv[])
                     bytes_to_read = file_size % packet_size;
                 }
 
-                fread_return = fread(buffer, bytes_to_read, 1, file);
-                if(fread_return != 1 || feof(file) > 0){
+                file_op_return = fread(buffer, bytes_to_read, 1, file);
+                if(file_op_return != 1 || feof(file) > 0){
                     if(ferror(file)){
                         perror("Error while reading file");
                         continue;
