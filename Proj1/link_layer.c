@@ -99,8 +99,8 @@ int setupPort(int port){
 
     newtio.c_lflag = 0;
 
-    newtio.c_cc[VTIME]    = 0.1;   
-    newtio.c_cc[VMIN]     = 0;  
+    newtio.c_cc[VTIME] =0.1;    
+    newtio.c_cc[VMIN] = 0;  
 
     tcflush(fd, TCIOFLUSH);
 
@@ -315,7 +315,7 @@ int setupReceiver(int fd){
     char ua[5] = {FLAG, A_RE, UA, A_RE ^ UA, FLAG};
 
     char buffer[255];
-    int state;
+    int state = OTHER_RCV;
     int stop = FALSE;
 
     while (stop == FALSE) {       
@@ -430,7 +430,7 @@ int sendDisconectAnswer(int fd){
     char disc[5] = {FLAG, A_RE, DISC, A_RE ^ DISC, FLAG};
 
     char buffer[255];
-    int state;
+    int state = OTHER_RCV;
 
     write(fd, disc, 5);
     flag = 0;
@@ -559,14 +559,16 @@ int sendInfoPacket(int fd, int frame_length, char* buffer){
 }
 
 int readPacket(int fd, char* buffer){
+    printf("Waiting for packet\n");
     char control_field;
     int bytes_read;
-    int state;
+    int state = OTHER_RCV;
     int stop = FALSE;
 
-    while (stop == FALSE) {       
-      read(fd, &buffer[0], 1);   
-                   
+    while (stop == FALSE) {    
+      read(fd, &buffer[0], 1); 
+      printf("Received: %x\n", buffer[0]);
+
       switch(state){
         case OTHER_RCV:
             if(buffer[0] == FLAG) { 
@@ -751,10 +753,6 @@ int llwrite(int fd, char* buffer, int msg_length){
     byteStuffing(&frame_length);
 
     int bytes_writen = sendInfoPacket(fd, frame_length, buffer);
-
-    if(bytes_writen < 0){
-        return -1;
-    }
 
     return bytes_writen;
 }

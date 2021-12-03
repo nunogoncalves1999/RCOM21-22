@@ -19,6 +19,7 @@ int portNr;
 char* path; 
 unsigned int packet_size;
 FILE* file;
+int file_fd;
 long file_size;
 int file_packets;
 
@@ -135,6 +136,7 @@ int main(int argc, char *argv[])
 
         path = argv[3];
         file = fopen(path, "rb");
+        file_fd = fileno(file);
 
         fseek(file, 0, SEEK_END);
         file_size = ftell(file);
@@ -159,6 +161,7 @@ int main(int argc, char *argv[])
     }
 
     fd = llopen(portNr, mode);
+    printf("Exited llopen\n");
 
     if(fd < 0){
         return -1;
@@ -170,14 +173,14 @@ int main(int argc, char *argv[])
 
     //Read loop if receiver
     if(mode == RECEIVER){
-        int bytesRead = 0;
+        int bytes_read = 0;
         char* filename;
         buffer = malloc(256);
 
         while(1){
-            bytesRead = llread(fd, buffer);
+            bytes_read = llread(fd, buffer);
 
-            if(bytesRead != 3 && bytesRead != 4 && bytesRead >= 0){
+            if(bytes_read != 3 && bytes_read != 4 && bytes_read >= 0){
                 break;
             }
 
@@ -189,10 +192,11 @@ int main(int argc, char *argv[])
                 }
 
                 file = fopen(filename, "w");
+                file_fd = fileno(file);
             }
 
             else if(buffer[0] == DATA_PACKET){
-                file_op_return = fwrite(&buffer[4], bytesRead - 4, 1, file);
+                file_op_return = write(file_fd, &buffer[4], bytes_read - 4);
 
                 if(file_op_return != 1 || feof(file) > 0){
                     perror("Error while writing in file");
@@ -205,20 +209,19 @@ int main(int argc, char *argv[])
             }
         }
 
-        if(bytesRead < 0){
+        if(bytes_read < 0){
             perror("Error on reading from port; aborting");
         }
     }
 
     //Write loop if transmitter
     if(mode == TRANSMITER){
-        printf("Transmiter beggining entered\n");
         int cp_length = buildControlPacket(&control_packet);
         printf("Control packet built\n");
         int bytes_writen = llwrite(fd, control_packet, cp_length);
-        printf("Control packet sent\n");
 
         if(bytes_writen > 0){
+            printf("Control packet sent\n");
             int data_packets_writen = 0;
             int bytes_to_read = packet_size;
 
@@ -227,7 +230,7 @@ int main(int argc, char *argv[])
                     bytes_to_read = file_size % packet_size;
                 }
 
-                file_op_return = fread(buffer, bytes_to_read, 1, file);
+                file_op_return = read(file_fd, buffer, bytes_to_read);
                 if(file_op_return != 1 || feof(file) > 0){
                     if(ferror(file)){
                         perror("Error while reading file");
@@ -263,6 +266,7 @@ int main(int argc, char *argv[])
         free(data_packet);
     }
 
+    printf("Closing file\n");
     if(llclose(fd) != 1){
         return -1;
     }
