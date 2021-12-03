@@ -3,29 +3,31 @@
 
 void timeout_handler();
 
-void flip_sequence_number();
+void flipSequenceNumber();
 
-int setup_port(int port);
+int setupPort(int port);
 
-int check_acknowledgement(char ack);
+int checkAcknowledgement(char ack);
 
-int check_control_field(char c);
+int checkControlField(char c);
 
-void byte_stuffing(int *length);
+int checkBcc2(char bcc2, int msgLength);
 
-void byte_destuffing(int *length);
+void byteStuffing(int *length);
 
-int setup_transmiter(int fd);
+void byteDestuffing(int *length);
 
-int setup_receiver(int fd);
+int setupTransmiter(int fd);
 
-int send_disconect_message(int fd);
+int setupReceiver(int fd);
 
-int send_disconect_answer(int fd);
+int sendDisconectMessage(int fd);
 
-int send_info_packet(int fd, int frameLength);
+int sendDisconectAnswer(int fd);
 
-int read_packet(int fd);
+int sendInfoPacket(int fd, int frameLength, char* buffer);
+
+int readPacket(int fd, char* buffer);
 
 int llopen(int port, int mode);
 

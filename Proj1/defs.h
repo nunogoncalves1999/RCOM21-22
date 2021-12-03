@@ -7,6 +7,8 @@
 #define DATA_PACKET 1
 #define START_PACKET 2
 #define END_PACKET 3
+#define SIZE_PARAM 0
+#define NAME_PARAM 1
 
 #define CTR_I_FRAME0 0x00
 #define CTR_I_FRAME1 0x40
