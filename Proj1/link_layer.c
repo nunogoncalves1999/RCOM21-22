@@ -559,7 +559,6 @@ int sendInfoPacket(int fd, int frame_length, char* buffer){
 }
 
 int readPacket(int fd, char* buffer){
-    printf("Waiting for packet\n");
     char control_field;
     int bytes_read;
     int state = OTHER_RCV;
@@ -567,12 +566,10 @@ int readPacket(int fd, char* buffer){
 
     while (stop == FALSE) {    
       read(fd, &buffer[0], 1); 
-      printf("Received: %x\n", buffer[0]);
 
       switch(state){
         case OTHER_RCV:
             if(buffer[0] == FLAG) { 
-                printf("Flag received\n");
                 bytes_read = 1;
                 state = FLAG_RCV; 
             }
@@ -581,7 +578,6 @@ int readPacket(int fd, char* buffer){
         case FLAG_RCV:
             if(buffer[0] == FLAG) { state = FLAG_RCV; }
             else if(buffer[0] == A_TR) { 
-                printf("A received\n");
                 bytes_read++;
                 state = A_RCV; 
             }
@@ -593,7 +589,6 @@ int readPacket(int fd, char* buffer){
             else if(checkControlField(buffer[0]) == 1) { 
                 bytes_read++;
                 control_field = buffer[0];
-                printf("%o received\n", control_field);
                 state = C_RCV; 
             }
             else { state = OTHER_RCV; }
@@ -602,7 +597,6 @@ int readPacket(int fd, char* buffer){
         case C_RCV:
             if(buffer[0] == FLAG) { state = FLAG_RCV; }
             else if(buffer[0] == (A_TR ^ control_field)) { 
-                printf("BCC received\n");
                 bytes_read++;
                 state = BCC_RCV; 
             }
@@ -621,10 +615,11 @@ int readPacket(int fd, char* buffer){
       frame[bytes_read - 1] = buffer[0];
     }
 
-    //write RR or REJ
     if(control_field == CTR_I_FRAME1 || control_field == CTR_I_FRAME0){
+        printf("Control entered\n");
         char answer[5];
         byteDestuffing(&bytes_read);
+        printf("Destuffing done\n");
 
         char bcc2 = frame[bytes_read - 2];
 
@@ -633,6 +628,7 @@ int readPacket(int fd, char* buffer){
         answer[4] = FLAG;
 
         if(checkBcc2(bcc2, bytes_read - FRAME_INFO_SIZE) == 1){
+            printf("Sending REJ\n");
             if(sequence_number == 1){
                 answer[2] = REJ1;
                 answer[3] = A_RE ^ REJ1;
@@ -646,6 +642,7 @@ int readPacket(int fd, char* buffer){
         }
 
         else{
+            printf("Sending RR\n");
             if(sequence_number == 1){
                 answer[2] = RR1;
                 answer[3] = A_RE ^ RR1;
@@ -656,6 +653,7 @@ int readPacket(int fd, char* buffer){
             }
 
             write(fd, answer, 5);
+            printf("Wrote RR\n");
 
             memcpy(buffer, &frame[INITIAL_FRAME_BITS], bytes_read - FRAME_INFO_SIZE);
 
@@ -678,6 +676,7 @@ int readPacket(int fd, char* buffer){
             bytes_read = DISC_RETURN;
         }
     }
+    printf("End of readPacket\n");
 
     return bytes_read;
 }
