@@ -17,8 +17,8 @@ unsigned int sequenceNumber;
 unsigned int timeout = 1;
 unsigned int maxTimeouts = 5;
 
-unsigned int s = 0;
-unsigned int r = 1;
+//0 if transmiter and 1 if receiver
+unsigned int mode;
 
 char frame[MAX_PACKET_SIZE];
 
@@ -34,6 +34,15 @@ void timeout_handler()
 	printf("timeout nº%d\n", timeoutCount);
 	flag = 1;
 	timeoutCount++;
+}
+
+void flip_sequence_number(){
+    if(sequenceNumber == 1){
+        sequenceNumber = 0;
+    }
+    else if(sequenceNumber == 0){
+        sequenceNumber = 1;
+    }
 }
 
 //Opens the port identified by the port number
@@ -103,13 +112,143 @@ int setup_port(int port){
     return fd;
 }
 
+int check_acknowledgement(char ack){
+    
+    if(ack == RR1 || ack == REJ1){
+        if(sequenceNumber == 0){
+            return 1;
+        }
+        else{
+            perror("Wrong sequence number value in acknowledgement");
+            return 0;
+        }
+    }
+
+    if(ack == RR0 || ack == REJ0){
+        if(sequenceNumber == 1){
+            return 1;
+        }
+        else{
+            perror("Wrong sequence number value in acknowledgement");
+            return 0;
+        }
+    }
+
+    return 0;
+}
+
+int check_control_field(char c){
+    if(c == CTR_I_FRAME1 || c == CTR_I_FRAME0 || c == SET || c == DISC){
+        return 1;
+    }
+
+    return 0;
+}
+
+int check_bcc2(char bcc2, int msgLength){
+    char testBcc2;
+
+    for (int i = 0; i < msgLength; i++)
+    {
+        if(i == 0){
+            testBcc2 = frame[i];
+        }
+        else{
+            testBcc2 ^= frame[i];
+        }
+    }
+
+    if(testBcc2 == bcc2){
+        return 1;
+    }
+
+    return 0;
+}
+
+void byte_stuffing(int *length){
+    int extraLength = 0;
+    int prevLength = *length;
+
+    for(int i = INITIAL_FRAME_BITS; i < prevLength - 1; i++){
+        if(frame[i] == FLAG || frame[i] == ESCAPE){
+            extraLength++;
+        }
+    }
+
+    *length += extraLength;
+    char tempFrame[*length];
+    int j = 0;
+    
+    for(int i = INITIAL_FRAME_BITS; i < prevLength - 1; i++){
+        if(frame[i] == FLAG){
+            tempFrame[j] = ESCAPE;
+            tempFrame[j+1] = FLAG ^ XOR_BYTE;
+            j += 2;
+        }
+        else if(frame[i] == ESCAPE){
+            tempFrame[j] = ESCAPE;
+            tempFrame[j+1] = ESCAPE ^ XOR_BYTE;
+            j += 2;
+        }
+        else{
+            tempFrame[j] = frame[i];
+            j++;
+        }   
+    }
+
+    for(int i = 0; i < *length - FRAME_INFO_SIZE + 1; i++){
+        frame[i + INITIAL_FRAME_BITS] = tempFrame[i];
+    }
+
+    frame[*length - 1] = FLAG;
+}
+
+void byte_destuffing(int *length){
+    int extraLength;
+    int prevLength = *length;
+
+    for(int i = INITIAL_FRAME_BITS; i < prevLength - 1; i++){
+        if(frame[i] == ESCAPE && (frame[i + 1] == (FLAG ^ XOR_BYTE) || frame[i + 1] == (ESCAPE ^ XOR_BYTE))){
+            extraLength++;
+        }
+    }
+
+    *length -= extraLength;
+    char tempFrame[*length];
+    int j = 0;
+
+    for(int i = INITIAL_FRAME_BITS; i < prevLength - 1; i++){
+        if(frame[i] == ESCAPE){
+            if(frame[i + 1] == (FLAG ^ XOR_BYTE)){
+                tempFrame[j] = FLAG;
+            }
+            else if(frame[i + 1] == (ESCAPE ^ XOR_BYTE)){
+                tempFrame[j] = ESCAPE;
+            }
+            i++;
+        }
+        else{
+            tempFrame[j] = frame[i];
+        }   
+        j++;
+    }
+
+    for(int i = 0; i < *length - FRAME_INFO_SIZE + 1; i++){
+        frame[i + INITIAL_FRAME_BITS] = tempFrame[i];
+    }
+
+    frame[*length - 1] = FLAG;
+}
+
 int setup_transmitter(int fd){
+    sequenceNumber = 0;
+    mode = 0;
+
     char set[5] = {FLAG, A_TR, SET, A_TR ^ SET, FLAG};
 
     char buffer[255];
     int state;
     timeoutCount = 0;
-    sequenceNumber = 0;
     flag = 0;
 
     (void) signal(SIGALRM, timeout_handler);
@@ -170,6 +309,9 @@ int setup_transmitter(int fd){
 }
 
 int setup_receiver(int fd){
+    sequenceNumber = 1;
+    mode = 1;
+
     char ua[5] = {FLAG, A_RE, UA, A_RE ^ UA, FLAG};
 
     char buffer[255];
@@ -289,41 +431,6 @@ int send_disconect_answer(int fd){
 
     char buffer[255];
     int state;
-    timeoutCount = 0;
-    int stop = FALSE;
-
-    while(stop == FALSE){
-        read(fd, &buffer[0], 1);   
-                   
-        switch(state){
-            case OTHER_RCV:
-                if(buffer[0] == FLAG) { state = FLAG_RCV; }
-                break;
-            
-            case FLAG_RCV:
-                if(buffer[0] == FLAG) { state = FLAG_RCV; }
-                else if(buffer[0] == A_TR) { state = A_RCV; }
-                else { state = OTHER_RCV; }
-                break;
-            
-            case A_RCV:
-                if(buffer[0] == FLAG) { state = FLAG_RCV; }
-                else if(buffer[0] == DISC) { state = C_RCV; }
-                else { state = OTHER_RCV; }
-                break;
-            
-            case C_RCV:
-                if(buffer[0] == FLAG) { state = FLAG_RCV; }
-                else if(buffer[0] == (A_TR ^ DISC)) { state = BCC_RCV; }
-                else { state = OTHER_RCV; }
-                break;
-            
-            case BCC_RCV:
-                if(buffer[0] == FLAG) { stop = TRUE; }
-                else { state = OTHER_RCV; }
-                break;
-        }
-    }
 
     write(fd, disc, 5);
     flag = 0;
@@ -375,42 +482,197 @@ int send_disconect_answer(int fd){
     return 0;
 }
 
-byte_stuffing(char *frame, int *length){
-    int extra_length = 0;
-    int prev_length = *length;
+int send_info_packet(int fd, int frameLength){
 
-    for(int i = 0; i < prev_length - FRAME_INFO_SIZE; i++){
-        if(frame[i + FRAME_INFO_SIZE] == FLAG || frame[i + FRAME_INFO_SIZE] == ESCAPE){
-            extra_length++;
+    char buffer[255];
+    int bytesWriten;
+    int state;
+    char ack;
+    timeoutCount = 0;
+    flag = 0;
+
+    (void) signal(SIGALRM, timeout_handler);
+
+    while(timeoutCount < maxTimeouts && flag < 2){
+        flag = 0;
+        alarm(timeout);
+
+        bytesWriten = write(fd, frame, frameLength);
+
+        state = OTHER_RCV;
+
+        while (flag == 0)
+        {
+            read(fd, buffer, 1);
+
+            switch(state){
+                case OTHER_RCV:
+                    if(buffer[0] == FLAG) { state = FLAG_RCV; }
+                    break;
+                        
+                case FLAG_RCV:
+                    if(buffer[0] == FLAG) { state = FLAG_RCV; }
+                    else if(buffer[0] == A_RE) { state = A_RCV; }
+                    else { state = OTHER_RCV; }
+                    break;
+                        
+                case A_RCV:
+                    if(buffer[0] == FLAG) { state = FLAG_RCV; }
+                    else if(check_acknowledgement(buffer[0]) == 1) {
+                        ack = buffer[0];
+                        state = C_RCV; 
+                    }
+                    else { state = OTHER_RCV; }
+                    break;
+                        
+                case C_RCV:
+                    if(buffer[0] == FLAG) { state = FLAG_RCV; }
+                    else if(buffer[0] == (FLAG ^ ack)) { state = BCC_RCV; }
+                    else { state = OTHER_RCV; }
+                    break;
+                        
+                case BCC_RCV:
+                    if(buffer[0] == FLAG) {  
+                        alarm(0);
+                        flag = 2;
+                    }
+                    else { state = OTHER_RCV; }
+                    break;
+            }
+        }
+
+        if(flag == 2){
+            flip_sequence_number();
+        }
+
+        else if(ack == REJ0 || ack == REJ1){
+            //If a REJ acknowledgement is received, flag is reset to 0 so there's a retry without a timeout
+            flag = 0;
         }
     }
 
-    *length += extra_length;
-    char tempFrame[*length];
-    int j = 0;
-    
-    for(int i = 0; i < prev_length - FRAME_INFO_SIZE; i++){
-        if(frame[i + FRAME_INFO_SIZE] == FLAG){
-            tempFrame[j] = ESCAPE;
-            tempFrame[j+1] = FLAG ^ XOR_BYTE;
-            j += 2;
+    if(timeoutCount >= maxTimeouts){
+        perror("Too many timeouts ocurred, didn't receive an acknowledgement");
+        return -1;
+    }
+
+    return bytesWriten;
+}
+
+int read_packet(int fd){
+    char buffer[255];
+    char controlField;
+    int bytesRead;
+    int state;
+    int stop = FALSE;
+
+    while (stop == FALSE) {       
+      read(fd, &buffer[0], 1);   
+                   
+      switch(state){
+        case OTHER_RCV:
+            if(buffer[0] == FLAG) { 
+                bytesRead = 1;
+                state = FLAG_RCV; 
+            }
+            break;
+        
+        case FLAG_RCV:
+            if(buffer[0] == FLAG) { state = FLAG_RCV; }
+            else if(buffer[0] == A_TR) { 
+                bytesRead++;
+                state = A_RCV; 
+            }
+            else { state = OTHER_RCV; }
+            break;
+        
+        case A_RCV:
+            if(buffer[0] == FLAG) { state = FLAG_RCV; }
+            else if(check_control_field(buffer[0]) == 1) { 
+                bytesRead++;
+                controlField = buffer[0];
+                state = C_RCV; 
+            }
+            else { state = OTHER_RCV; }
+            break;
+        
+        case C_RCV:
+            if(buffer[0] == FLAG) { state = FLAG_RCV; }
+            else if(buffer[0] == (A_TR ^ controlField)) { 
+                bytesRead++;
+                state = BCC_RCV; 
+            }
+            else { state = OTHER_RCV; }
+            break;
+        
+        case BCC_RCV:
+            if(buffer[0] == FLAG) { stop = TRUE; }
+            else { bytesRead++; }
+            break;
+      }
+
+      frame[bytesRead - 1] = buffer[0];
+    }
+
+    //write RR or REJ
+    if(controlField == CTR_I_FRAME1 || controlField == CTR_I_FRAME0){
+        char answer[5];
+        byte_destuffing(&bytesRead);
+
+        char bcc2 = frame[bytesRead - 2];
+
+        answer[0] = FLAG;
+        answer[1] = A_RE;
+        answer[4] = FLAG;
+
+        if(check_bcc2(bcc2, bytesRead - FRAME_INFO_SIZE) == 1){
+            if(sequenceNumber == 1){
+                answer[2] = REJ1;
+                answer[3] = A_RE ^ REJ1;
+            }
+            else if (sequenceNumber == 0){
+                answer[2] = REJ0;
+                answer[3] = A_RE ^ REJ0;
+            }
+
+            write(fd, answer, 5);
         }
-        else if(frame[i + FRAME_INFO_SIZE] == ESCAPE){
-            tempFrame[j] = ESCAPE;
-            tempFrame[j+1] = ESCAPE ^ XOR_BYTE;
-            j += 2;
+
+        else{
+            if(sequenceNumber == 1){
+                answer[2] = RR1;
+                answer[3] = A_RE ^ RR1;
+            }
+            else if(sequenceNumber == 0){
+                answer[2] = RR0;
+                answer[3] = A_RE ^ RR0;
+            }
+
+            write(fd, answer, 5);
+
+            memcpy(buffer, &frame[INITIAL_FRAME_BITS], bytesRead - FRAME_INFO_SIZE);
+
+            flip_sequence_number();
+        }
+    }
+
+    else if(controlField == SET){
+        char ua[5] = {FLAG, A_RE, UA, A_RE ^ UA, FLAG};
+
+        write(fd, ua, 5);
+    }
+
+    else if(controlField == DISC){
+
+        if(send_disconect_answer(fd) < 0){
+            bytesRead = DISC_ERROR;
         }
         else{
-            tempFrame[j] = frame[i];
-            j++;
-        }   
+            bytesRead = DISC_RETURN;
+        }
     }
 
-    for(int i = 0; i < *length; i++){
-        frame[i + FRAME_INFO_SIZE] = tempFrame[i];
-    }
-
-    frame[*length - 1] = FLAG;
+    return bytesRead;
 }
 
 int llopen(int port, int mode){
@@ -440,25 +702,34 @@ int llopen(int port, int mode){
     return fd;
 }
 
-int llwrite(int fd, char* buffer, int length){
+int llwrite(int fd, char* buffer, int msgLength){
 
-    int frame_length = length + FRAME_INFO_SIZE;
+    if(fcntl(fd, F_GETFD) < 0){
+        perror("Invalid fd");
+        return -1;
+    }
+
+    int frameLength = msgLength + FRAME_INFO_SIZE;
     char bcc2;
     
     frame[0] = FLAG;
     frame[1] = A_TR;
     
-    if(r == 1){
+    if(sequenceNumber == 1){
         frame[2] = CTR_I_FRAME1;
         frame[3] = A_TR ^ CTR_I_FRAME1;
     }
 
-    else if(r == 0){
+    else if(sequenceNumber == 0){
         frame[2] = CTR_I_FRAME0;
         frame[3] = A_TR ^ CTR_I_FRAME0;
     }
 
-    for (int i = 0; i < length; i++)
+    else{
+        perror("r has an erroneous value, it should only take values of 1 or 0");
+    }
+
+    for (int i = 0; i < msgLength; i++)
     {
         frame[i + INITIAL_FRAME_BITS] = buffer[i];
         if(i == 0){
@@ -469,21 +740,31 @@ int llwrite(int fd, char* buffer, int length){
         }
     }
     
-    frame[frame_length - 2] = bcc2;
-    frame[frame_length - 1] = FLAG;
+    frame[frameLength - 2] = bcc2;
+    frame[frameLength - 1] = FLAG;
 
-    byte_stuffing(frame, &frame_length);
+    byte_stuffing(&frameLength);
 
-    else{
-        perror("r has an erroneous value, it should only take values of 1 or 0");
+    int bytesWriten = send_info_packet(fd, frameLength);
+
+    if(bytesWriten < 0){
+        return -1;
     }
 
-    return -1;
+    return bytesWriten;
 }
 
 int llread(int fd, char* buffer){
-    printf("Not implemented yet\n");
-    return -1;
+    int frameLength = 0;
+
+    if(fcntl(fd, F_GETFD) < 0){
+        perror("Invalid fd");
+        return -1;
+    }
+
+    frameLength = read_packet(fd);
+
+    return frameLength;
 }
 
 int llclose(int fd){
@@ -493,21 +774,10 @@ int llclose(int fd){
         return -1;
     }
     
-    if(sequenceNumber == 0){
+    if(mode == 0){
         if(send_disconect_message(fd) < 0){
             return -1;
         }
-    }
-
-    else if(sequenceNumber == 1){
-        if(send_disconect_answer(fd) < 0){
-            return -1;
-        }
-    }
-
-    else{
-        perror("Invalid sequence number!");
-        return -1;
     }
 
     if(tcsetattr(fd, TCSANOW, &oldtio) == -1) {

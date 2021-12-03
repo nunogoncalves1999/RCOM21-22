@@ -33,7 +33,11 @@
 
 #define FRAME_INFO_SIZE 6
 #define INITIAL_FRAME_BITS 4
+#define FINAL_FRAME_BITS 2
 #define MAX_PACKET_SIZE 64000
+
+#define DISC_RETURN 4
+#define DISC_ERROR 3
 
 #define TRANSMITER 0
 #define RECEIVER 1
