@@ -23,7 +23,7 @@ int file_fd;
 long file_size;
 int file_packets;
 
-int buildControlPacket(char** packet){
+int buildControlPacket(uint8_t** packet){
     unsigned int packet_size;
     char* filename;
 
@@ -32,7 +32,7 @@ int buildControlPacket(char** packet){
 		filename = &(marker[1]);
     }
 
-    char fs_oct = 0; 
+    int fs_oct = 0; 
     long fs_temp = file_size;
 
     while(fs_temp > 0){
@@ -41,8 +41,8 @@ int buildControlPacket(char** packet){
     }
 
     int fn_length = strlen(filename);
-    packet_size = 5 + fs_oct + fn_length;
-    *packet = (char*) malloc(packet_size);
+    packet_size = 6 + fs_oct + fn_length;
+    *packet = (uint8_t*) malloc(packet_size);
 
     (*packet)[0] = START_PACKET;
     (*packet)[1] = SIZE_PARAM;
@@ -63,7 +63,7 @@ int buildControlPacket(char** packet){
     return packet_size;
 }
 
-int buildDataPacket(char** packet, int packet_nr, char* data, int data_size){
+int buildDataPacket(uint8_t** packet, int packet_nr, uint8_t* data, int data_size){
     unsigned int packet_size = data_size + 4;
     *packet = malloc(packet_size);
 
@@ -75,11 +75,12 @@ int buildDataPacket(char** packet, int packet_nr, char* data, int data_size){
     for(int i = 0; i < data_size; i++){
         (*packet)[i + 4] = data[i];
     }
-
+    printf("Packet size: %i\n", packet_size);
     return packet_size;
 }
 
-void unpackControlPacket(char* packet, char** filename){
+void unpackControlPacket(uint8_t* packet, char** filename){
+    //printf("Unpack entered\n");
     int pointer = 2;
     int fs_oct = packet[pointer];
     pointer++;
@@ -97,10 +98,12 @@ void unpackControlPacket(char* packet, char** filename){
     *filename = malloc(fn_length + 1);
 
     for(int i = 0; i < fn_length; i++){
-        *filename[i] = packet[pointer];
+        (*filename)[i] = packet[pointer];
         pointer++;
     }
-    *filename[fn_length] = '\0';
+
+    (*filename)[fn_length] = '\0';
+    printf("Filename: %s\n", *filename);
 }
 
 int main(int argc, char *argv[])
@@ -118,7 +121,7 @@ int main(int argc, char *argv[])
 
     portNr = strtol(argv[1], NULL, 10);
     mode = strtol(argv[2], NULL, 10);
-    char* buffer;
+    uint8_t* buffer;
 
     if(mode != TRANSMITER && mode != RECEIVER){
         printf("Invalid mode; mode can only be 0 (transmiter) or 1 (receiver)\n");
@@ -136,16 +139,18 @@ int main(int argc, char *argv[])
 
         path = argv[3];
         file = fopen(path, "rb");
-        file_fd = fileno(file);
+        //file_fd = fileno(file);
+        printf("Opened file\n");
 
-        fseek(file, 0, SEEK_END);
-        file_size = ftell(file);
-        
         if(file == NULL){
             perror("Couldn't open the file indicated in <file path>");
             return -1;
         }
 
+        fseek(file, 0, SEEK_END);
+        file_size = ftell(file);
+        fseek(file, 0, SEEK_SET);
+        
         packet_size = strtol(argv[4], NULL, 10);
         buffer = malloc(packet_size);
 
@@ -161,14 +166,14 @@ int main(int argc, char *argv[])
     }
 
     fd = llopen(portNr, mode);
-    printf("Exited llopen\n");
+    printf("Comunication port opened\n");
 
     if(fd < 0){
         return -1;
     }
 
-    char* control_packet = NULL;
-    char* data_packet = NULL;
+    uint8_t* control_packet = NULL;
+    uint8_t* data_packet = NULL;
     int file_op_return;
 
     //Read loop if receiver
@@ -179,8 +184,9 @@ int main(int argc, char *argv[])
 
         while(1){
             bytes_read = llread(fd, buffer);
+            printf("llread finished with %i bytes read\n", bytes_read);
 
-            if(bytes_read != 3 && bytes_read != 4 && bytes_read >= 0){
+            if(bytes_read == 3 || bytes_read == 4 || bytes_read < 0){
                 break;
             }
 
@@ -191,12 +197,16 @@ int main(int argc, char *argv[])
                     buffer = realloc(buffer, file_size);
                 }
 
-                file = fopen(filename, "w");
-                file_fd = fileno(file);
+                file = fopen(filename, "wb");
+                printf("Opened file\n");
+                //file_fd = fileno(file);
+                //printf("Fileno\n");
             }
 
             else if(buffer[0] == DATA_PACKET){
-                file_op_return = write(file_fd, &buffer[4], bytes_read - 4);
+
+                file_op_return = fwrite(&buffer[4], bytes_read - 9, 1, file);
+                //printf("fwrite done\n");
 
                 if(file_op_return != 1 || feof(file) > 0){
                     perror("Error while writing in file");
@@ -221,7 +231,7 @@ int main(int argc, char *argv[])
         int bytes_writen = llwrite(fd, control_packet, cp_length);
 
         if(bytes_writen > 0){
-            printf("Control packet sent\n");
+            printf("Control packet sent, sending data\n");
             int data_packets_writen = 0;
             int bytes_to_read = packet_size;
 
@@ -230,7 +240,8 @@ int main(int argc, char *argv[])
                     bytes_to_read = file_size % packet_size;
                 }
 
-                file_op_return = read(file_fd, buffer, bytes_to_read);
+                file_op_return = fread(buffer, 1, bytes_to_read, file);
+
                 if(file_op_return != 1 || feof(file) > 0){
                     if(ferror(file)){
                         perror("Error while reading file");
@@ -239,7 +250,9 @@ int main(int argc, char *argv[])
                 }
 
                 int dp_length = buildDataPacket(&data_packet, data_packets_writen, buffer, bytes_to_read);
+                //printf("Sending data\n");
                 bytes_writen = llwrite(fd, data_packet, dp_length);
+                //printf("Data packet sent\n");
 
                 if(bytes_writen == -2){
                     break;

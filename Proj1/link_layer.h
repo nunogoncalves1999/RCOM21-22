@@ -7,11 +7,11 @@ void flipSequenceNumber();
 
 int setupPort(int port);
 
-int checkAcknowledgement(char ack);
+int checkAcknowledgement(uint8_t ack);
 
-int checkControlField(char c);
+int checkControlField(uint8_t c);
 
-int checkBcc2(char bcc2, int msgLength);
+int checkBcc2(uint8_t bcc2, int msgLength);
 
 void byteStuffing(int *length);
 
@@ -25,15 +25,15 @@ int sendDisconectMessage(int fd);
 
 int sendDisconectAnswer(int fd);
 
-int sendInfoPacket(int fd, int frameLength, char* buffer);
+int sendInfoPacket(int fd, int frameLength, uint8_t* buffer);
 
-int readPacket(int fd, char* buffer);
+int readPacket(int fd, uint8_t* buffer);
 
 int llopen(int port, int mode);
 
-int llwrite(int fd, char* buffer, int length);
+int llwrite(int fd, uint8_t* buffer, int length);
 
-int llread(int fd, char* buffer);
+int llread(int fd, uint8_t* buffer);
 
 int llclose(int fd);
 
