@@ -64,7 +64,7 @@ int buildControlPacket(uint8_t** packet){
 }
 
 int buildDataPacket(uint8_t** packet, int packet_nr, uint8_t* data, int data_size){
-    unsigned int packet_size = data_size + 4;
+    unsigned int packet_size = data_size + 5;
     *packet = malloc(packet_size);
 
     (*packet)[0] = DATA_PACKET;
@@ -205,8 +205,8 @@ int main(int argc, char *argv[])
 
             else if(buffer[0] == DATA_PACKET){
 
-                file_op_return = fwrite(&buffer[4], bytes_read - 9, 1, file);
-                //printf("fwrite done\n");
+                file_op_return = fwrite(&buffer[4], 1, bytes_read - 10, file);
+                printf("Wrote %i bytes\n", bytes_read - 9);
 
                 if(file_op_return != 1 || feof(file) > 0){
                     perror("Error while writing in file");
