@@ -25,9 +25,9 @@ int sendDisconectMessage(int fd);
 
 int sendDisconectAnswer(int fd);
 
-int sendInfoPacket(int fd, int frameLength, uint8_t* buffer);
+int sendInfoFrame(int fd, int frameLength, uint8_t* buffer);
 
-int readPacket(int fd, uint8_t* buffer);
+int readFrame(int fd, uint8_t* buffer);
 
 int llopen(int port, int mode);
 

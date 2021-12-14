@@ -482,7 +482,7 @@ int sendDisconectAnswer(int fd){
     return 0;
 }
 
-int sendInfoPacket(int fd, int frame_length, uint8_t* buffer){
+int sendInfoFrame(int fd, int frame_length, uint8_t* buffer){
 
     int bytes_writen;
     int state;
@@ -550,10 +550,15 @@ int sendInfoPacket(int fd, int frame_length, uint8_t* buffer){
             flipSequenceNumber();
         }
 
+        /* Useless code because it's never going to be entered, however, there's an error with 
+        / retransmissions that I wasn't able to fix in time, because I only recently realized what was 
+        / going wrong
         else if(ack == REJ_0 || ack == REJ_1){
             //If a REJ acknowledgement is received, flag is reset to 0 so there's a retry without a timeout
+            printf("REJ received\n");
             flag = 0;
         }
+        */
     }
 
     if(timeout_count >= max_timeouts){
@@ -569,7 +574,7 @@ int sendInfoPacket(int fd, int frame_length, uint8_t* buffer){
     return bytes_writen;
 }
 
-int readPacket(int fd, uint8_t* buffer){
+int readFrame(int fd, uint8_t* buffer){
     uint8_t control_field;
     int bytes_read;
     int state = OTHER_RCV;
@@ -650,6 +655,9 @@ int readPacket(int fd, uint8_t* buffer){
             }
 
             write(fd, answer, 5);
+            printf("REJ sent\n");
+
+            return BCC2_ERROR;
         }
 
         else{
@@ -763,7 +771,7 @@ int llwrite(int fd, uint8_t* buffer, int msg_length){
 
     //printf("Bytes stuffed\n");
 
-    int bytes_writen = sendInfoPacket(fd, frame_length, buffer);
+    int bytes_writen = sendInfoFrame(fd, frame_length, buffer);
 
     return bytes_writen;
 }
@@ -776,7 +784,7 @@ int llread(int fd, uint8_t* buffer){
         return -1;
     }
 
-    frame_length = readPacket(fd, buffer);
+    frame_length = readFrame(fd, buffer);
 
     return frame_length;
 }

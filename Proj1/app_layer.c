@@ -13,13 +13,12 @@
 #include "link_layer.h"
 
 int fd;
-int mode;
+unsigned int mode;
 int portNr;
 
 char* path; 
 unsigned int packet_size;
 FILE* file;
-int file_fd;
 long file_size;
 int file_packets;
 
@@ -184,9 +183,9 @@ int main(int argc, char *argv[])
 
         while(1){
             bytes_read = llread(fd, buffer);
-            printf("llread finished with %i bytes read\n", bytes_read);
+            printf("llread finished with a value of %i\n", bytes_read);
 
-            if(bytes_read == 3 || bytes_read == 4 || bytes_read < 0){
+            if(bytes_read == DISC_RETURN || bytes_read == DISC_ERROR || bytes_read < 0){
                 break;
             }
 
@@ -203,12 +202,12 @@ int main(int argc, char *argv[])
                 //printf("Fileno\n");
             }
 
-            else if(buffer[0] == DATA_PACKET){
+            else if(buffer[0] == DATA_PACKET && bytes_read != BCC2_ERROR){
 
                 file_op_return = fwrite(&buffer[4], 1, bytes_read - 10, file);
                 printf("Wrote %i bytes\n", bytes_read - 9);
 
-                if(file_op_return != 1 || feof(file) > 0){
+                if(file_op_return < 0 || feof(file) > 0){
                     perror("Error while writing in file");
                     continue;
                 }
@@ -268,7 +267,6 @@ int main(int argc, char *argv[])
         }
     }
 
-    //Closing file, cleaning up used space and printing debugs to check errors
     fclose(file);
 
     free(buffer);

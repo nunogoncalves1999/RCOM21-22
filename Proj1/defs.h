@@ -42,6 +42,7 @@ typedef unsigned char uint8_t;
 
 #define DISC_RETURN 4
 #define DISC_ERROR 3
+#define BCC2_ERROR 2 
 
 #define TRANSMITER 0
 #define RECEIVER 1
@@ -49,3 +50,8 @@ typedef unsigned char uint8_t;
 #define DEFAULT_BAUD B9600
 
 #endif
+
+//ip 172.16.1.53 for school computer
+//ip 192.168.109.15
+//User: netedu
+//password: torvalds
