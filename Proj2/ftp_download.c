@@ -158,6 +158,7 @@ int read_msg_aux(int socket_fd, char* code, char** reply){
 
     if(strncmp(code_comp, code, 3) != 0){
         printf("Code doesn't match!\n");
+        printf("Got %s, expected %s\n", code_comp, code);
         return 1;
     }
 
