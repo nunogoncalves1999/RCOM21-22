@@ -14,6 +14,8 @@
 
 #include "defs.h"
 
+// DATA STRUCTURE MANAGEMENT 
+
 int process_args(const char* url, conection_info *info){
     char user[256] = {0};
     char password[256] = {0};
@@ -86,9 +88,21 @@ void debug_print(conection_info info){
     printf("Host name: %s\n", info.hostname);
     printf("File path: %s\n", info.path);
     printf("File location path: %s\n", info.directory_path);
-    printf("File nameh: %s\n", info.filename);
+    printf("File name: %s\n", info.filename);
     printf("Host address: %s\n", info.address);
 }
+
+void free_buffers(conection_info* info){
+    free(info->user);
+    free(info->password);
+    free(info->hostname);
+    free(info->path);
+    free(info->directory_path);
+    free(info->filename);
+    free(info->address);
+}
+
+// SOCKET OPENING AND CLOSURE
 
 int open_socket(int *socket_fd, char* address, FILE** socket_file, size_t port){
     struct sockaddr_in server_addr;
@@ -127,13 +141,7 @@ int close_socket(int socket_fd){
     return 0;
 }
 
-void free_buffers(conection_info* info){
-    free(info->user);
-    free(info->password);
-    free(info->hostname);
-    free(info->path);
-    free(info->address);
-}
+// READ AND WRITE OPERATIONS
 
 int read_msg_aux(int socket_fd, char* code, char** reply){
 
@@ -274,6 +282,8 @@ int download_file(int fd, FILE* downloaded, size_t file_size){
     return 0;
 }
 
+// MAIN FUNCTION
+
 int main(int argc, char const *argv[])
 {
 	if(argc != 2)
@@ -348,12 +358,12 @@ int main(int argc, char const *argv[])
     //Getting file size
     write_msg(socket_fd, "SIZE %s%s", info.path, line_endings);
 
-    int file_retreived = 0;
+    int size_retreived = 0;
 	size_t file_size = 0;
 
     if(read_msg(socket_fd, "213", &reply) == 0){
         file_size = strtol(&reply[4], NULL, 10);
-		file_retreived = 1;
+		size_retreived = 1;
 		free(reply);
     }
 
@@ -439,9 +449,9 @@ int main(int argc, char const *argv[])
         return 1;
     }
 
-    if(file_retreived == 0) {
+    if(size_retreived == 0) {
 		sscanf(reply, "%[^(](%ld", discard, &file_size);
-		printf("%ld\n", file_size);
+		printf("File size: %ld bytes\n", file_size);
 	}
 
 	download_file(retrieved_fd, downloaded, file_size);
