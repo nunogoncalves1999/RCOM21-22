@@ -60,7 +60,7 @@ end
 /////   CONFIGURATION FOR THE CISCO ROUTER    /////
 //To configure in tux3
 
-interface FastEthernet0/0
+interface GigabitEthernet0/0
  description $ETH-LAN$$ETH-SW-LAUNCH$$INTF-INFO-FE 0$
  ip address 172.16.1.59 255.255.255.0
  ip nat outside
@@ -68,7 +68,7 @@ interface FastEthernet0/0
  duplex auto
  speed auto
 !
-interface FastEthernet0/1
+interface GigabitEthernet0/1
  ip address 172.16.51.254 255.255.255.0
  ip nat inside
  ip virtual-reassembly
