@@ -9,6 +9,7 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <stdarg.h>
+#include <time.h>
 
 #include <string.h>
 
@@ -59,7 +60,7 @@ int process_args(const char* url, conection_info *info){
 
     param_length = strlen(path);
     info->path = (char*) malloc(param_length);
-    memcpy(info->path, path, param_length);
+    memcpy(info->path, path, param_length + 1);
 
     char* filename = strrchr(path, '/');
 	if(filename == NULL) {
@@ -80,16 +81,6 @@ int process_args(const char* url, conection_info *info){
     memcpy(info->address, address, 20);
 
     return 0;
-}
-
-void debug_print(conection_info info){
-    printf("Username: %s\n", info.user);
-    printf("Password: %s\n", info.password);
-    printf("Host name: %s\n", info.hostname);
-    printf("File path: %s\n", info.path);
-    printf("File location path: %s\n", info.directory_path);
-    printf("File name: %s\n", info.filename);
-    printf("Host address: %s\n", info.address);
 }
 
 void free_buffers(conection_info* info){
@@ -282,6 +273,30 @@ int download_file(int fd, FILE* downloaded, size_t file_size){
     return 0;
 }
 
+//DEBUG FUNCTIONS
+
+void print_conection_info(conection_info info){
+    printf("Username: %s\n", info.user);
+    printf("Password: %s\n", info.password);
+    printf("Host name: %s\n", info.hostname);
+    printf("File path: %s\n", info.path);
+    printf("File location path: %s\n", info.directory_path);
+    printf("File name: %s\n", info.filename);
+    printf("Host address: %s\n", info.address);
+}
+
+void show_download_time(struct timespec start_time, struct timespec finish_time){
+    long sec = finish_time.tv_sec - start_time.tv_sec;
+    long nsec = finish_time.tv_nsec - start_time.tv_nsec;
+
+    if(start_time.tv_nsec > finish_time.tv_nsec){
+        sec--;
+        nsec += 1000000000; 
+    }
+
+    printf("Download time: %i,%i s\n", (int) sec, (int) nsec);
+}
+
 // MAIN FUNCTION
 
 int main(int argc, char const *argv[])
@@ -298,7 +313,7 @@ int main(int argc, char const *argv[])
         return 1;
     }
 
-    debug_print(info);
+    print_conection_info(info);
 
     //Opening and conecting to sockets
     int socket_fd;
@@ -451,10 +466,16 @@ int main(int argc, char const *argv[])
 
     if(size_retreived == 0) {
 		sscanf(reply, "%[^(](%ld", discard, &file_size);
-		printf("File size: %ld bytes\n", file_size);
 	}
 
+    printf("File size: %ld bytes\n", file_size);
+
+    struct timespec start_time;
+    struct timespec finish_time;
+
+    clock_gettime(CLOCK_MONOTONIC, &start_time);
 	download_file(retrieved_fd, downloaded, file_size);
+    clock_gettime(CLOCK_MONOTONIC, &finish_time);
 
 	fseek(downloaded, 0L, SEEK_END);
 	long received_size = ftell(downloaded);
@@ -464,6 +485,8 @@ int main(int argc, char const *argv[])
     if(read_msg(socket_fd, "226", &reply) != 0){
         printf("Failed while recieving final message\n");
     }
+
+    show_download_time(start_time, finish_time);
 
     //Closing stuff at the end of the program
     free(reply);

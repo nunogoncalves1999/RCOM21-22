@@ -1,60 +1,76 @@
-!
-version 12.4
-service timestamps debug datetime msec
-service timestamps log datetime msec
-service password-encryption
-!
-hostname gnu-rtr1
-!
-boot-start-marker
-boot-end-marker
-!
-! card type command needed for slot/vwic-slot 0/0
-logging message-counter syslog
-logging buffered 51200 warnings
-enable secret 5 $1$u53Q$vBawpP8.1YpCT6ypap1zX.
-!
-no aaa new-model
-dot11 syslog
-ip source-route
-!
-!
-!
-!
-ip cef
-no ip domain lookup
-no ipv6 cef
-!
-multilink bundle-name authenticated
-!
-!
-!
-!
-!
-username root privilege 15 secret 5 $1$8AFR$bNAYevxPFjXFExpnZI2fj.
-username cisco password 7 02050D480809
-archive
- log config
-  hidekeys
-! 
-!
-!
-!
-!
-!
-!
-!
-interface FastEthernet0/16
+/////   TUX 2    /////
+
+ifconfig eth0 down
+ifconfig eth0 up
+ifconfig eth0 172.16.51.1/24
+
+//After vlans are configured
+route add -net 172.16.50.0/24 gw 172.16.51.253
+
+//After cisco router is configured
+route add default gw 172.16.51.254 
+
+
+/////   TUX 3    /////
+
+ifconfig eth0 down
+ifconfig eth0 up
+ifconfig eth0 172.16.50.1/24
+
+//After vlans are configured
+route add -net 172.16.5q.0/24 gw 172.16.50.254
+
+
+/////   TUX 4    /////
+
+ifconfig eth0 down
+ifconfig eth1 down
+ifconfig eth0 up
+ifconfig eth0 172.16.50.254/24
+ifconfig eth1 up
+ifconfig eth1 172.16.51.253/24
+
+//After cisco router is configured
+route add default gw 172.16.51.254 
+
+
+/////   VLAN    /////
+//Do after configuring the ip adresses
+//Cables should be configured to the right entrance in the switch
+//tux2 eth0 in 1, tux3 eth0 in 5, tux4 eth0 in 9 and tux4 eth1 in 11
+
+configure terminal
+vlan 50
+interface fastethernet 0/5
+switchport mode access
+switchport access vlan 50
+interface fastethernet 0/9
+switchport mode access
+switchport access vlan 50
+vlan 51
+interface fastethernet 0/1
+switchport mode access
+switchport access vlan 51
+interface fastethernet 0/11
+switchport mode access
+switchport access vlan 51
+end
+
+
+/////   CONFIGURATION FOR THE CISCO ROUTER    /////
+//To configure in tux3
+
+interface FastEthernet0/0
  description $ETH-LAN$$ETH-SW-LAUNCH$$INTF-INFO-FE 0$
  ip address 172.16.1.59 255.255.255.0
- ip nat inside
+ ip nat outside
  ip virtual-reassembly
  duplex auto
  speed auto
 !
-interface FastEthernet0/11
+interface FastEthernet0/1
  ip address 172.16.51.254 255.255.255.0
- ip nat outside
+ ip nat inside
  ip virtual-reassembly
  duplex auto
  speed auto
@@ -72,8 +88,8 @@ ip http timeout-policy idle 60 life 86400 requests 10000
 ip nat pool ovrld 172.16.1.59 172.16.254.45 prefix-length 24
 ip nat outside source list 1 pool ovrld overload
 !
-access-list 1 permit 172.16.50.0 255.255.255.7
-access-list 1 permit 172.16.30.0 255.255.255.0
+access-list 1 permit 172.16.50.0 0.0.0.7
+access-list 1 permit 172.16.51.0 0.0.0.7
 !
 !
 !
