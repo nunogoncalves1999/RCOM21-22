@@ -20,6 +20,9 @@ ifconfig eth0 172.16.50.1/24
 //After vlans are configured
 route add -net 172.16.51.0/24 gw 172.16.50.254
 
+//After cisco router is configured
+route add default gw 172.16.50.254 
+
 
 /////   TUX 4    /////
 
@@ -89,34 +92,9 @@ ip http secure-server
 ip http timeout-policy idle 60 life 86400 requests 10000
 !
 !
-ip nat pool ovrld 172.16.1.59 172.16.51.254 prefix-length 24
+ip nat pool ovrld 172.16.1.59 172.16.1.59 prefix-length 16
 ip nat inside source list 1 pool ovrld overload
 !
 access-list 1 permit 172.16.50.0 0.0.0.7
 access-list 1 permit 172.16.51.0 0.0.0.7
-!
-!
-!
-!
-!
-!
-control-plane
-!
-!
-!
-line con 0
- login local
-line aux 0
-line vty 0 4
- access-class 23 in
- privilege level 15
- login local
- transport input telnet ssh
-line vty 5 15
- access-class 23 in
- privilege level 15
- login local
- transport input telnet ssh
-!
-scheduler allocate 20000 1000
 end
