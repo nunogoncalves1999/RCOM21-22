@@ -66,15 +66,15 @@ end
 config terminal
 interface GigabitEthernet0/0
  description $ETH-LAN$$ETH-SW-LAUNCH$$INTF-INFO-FE 0$
- ip address 172.16.1.59 255.255.255.0
- ip nat outside
+ ip address 172.16.51.254 255.255.255.0
+ ip nat inside
  ip virtual-reassembly
  duplex auto
  speed auto
 !
 interface GigabitEthernet0/1
- ip address 172.16.51.254 255.255.255.0
- ip nat inside
+ ip address 172.16.1.59 255.255.255.0
+ ip nat outside
  ip virtual-reassembly
  duplex auto
  speed auto
@@ -89,8 +89,8 @@ ip http secure-server
 ip http timeout-policy idle 60 life 86400 requests 10000
 !
 !
-ip nat pool ovrld 172.16.1.59 172.16.254.45 prefix-length 24
-ip nat outside source list 1 pool ovrld overload
+ip nat pool ovrld 172.16.1.59 172.16.51.254 prefix-length 24
+ip nat inside source list 1 pool ovrld overload
 !
 access-list 1 permit 172.16.50.0 0.0.0.7
 access-list 1 permit 172.16.51.0 0.0.0.7
